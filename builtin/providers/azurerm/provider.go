@@ -139,60 +139,7 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		return nil, err
 	}
 
-	err = registerAzureResourceProvidersWithSubscription(client.rivieraClient)
-	if err != nil {
-		return nil, err
-	}
-
 	return client, nil
-}
-
-func registerProviderWithSubscription(providerName string, client *riviera.Client) error {
-	request := client.NewRequest()
-	request.Command = riviera.RegisterResourceProvider{
-		Namespace: providerName,
-	}
-
-	response, err := request.Execute()
-	if err != nil {
-		return fmt.Errorf("Cannot request provider registration for Azure Resource Manager: %s.", err)
-	}
-
-	if !response.IsSuccessful() {
-		return fmt.Errorf("Credentials for acessing the Azure Resource Manager API are likely " +
-			"to be incorrect, or\n  the service principal does not have permission to use " +
-			"the Azure Service Management\n  API.")
-	}
-
-	return nil
-}
-
-var providerRegistrationOnce sync.Once
-
-// registerAzureResourceProvidersWithSubscription uses the providers client to register
-// all Azure resource providers which the Terraform provider may require (regardless of
-// whether they are actually used by the configuration or not). It was confirmed by Microsoft
-// that this is the approach their own internal tools also take.
-func registerAzureResourceProvidersWithSubscription(client *riviera.Client) error {
-	var err error
-	providerRegistrationOnce.Do(func() {
-		// We register Microsoft.Compute during client initialization
-		providers := []string{"Microsoft.Network", "Microsoft.Cdn", "Microsoft.Storage", "Microsoft.Sql", "Microsoft.Search", "Microsoft.Resources", "Microsoft.ServiceBus"}
-
-		var wg sync.WaitGroup
-		wg.Add(len(providers))
-		for _, providerName := range providers {
-			go func(p string) {
-				defer wg.Done()
-				if innerErr := registerProviderWithSubscription(p, client); err != nil {
-					err = innerErr
-				}
-			}(providerName)
-		}
-		wg.Wait()
-	})
-
-	return err
 }
 
 // azureRMNormalizeLocation is a function which normalises human-readable region/location
